@@ -1,0 +1,14 @@
+body {
+    user-select: none;
+    background-color: #111111;
+}
+
+#mapContainer {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.mapCell {
+    border: 1px solid black;
+    box-sizing: border-box;
+}
