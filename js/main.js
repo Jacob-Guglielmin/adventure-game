@@ -8,8 +8,10 @@ rooms = [],
 seed = null,
 seededRandom = null,
 
-mapWidth = 50,
+mapWidth = 60,
 mapHeight = 30,
+
+buildAttempts = 0,
 
 //Tile types
 TILES = {
@@ -42,30 +44,66 @@ function init() {
     mapContainer.style.width = (mapWidth * 20) + "px";
     mapContainer.style.height = (mapHeight * 20) + "px";
 
+    fillMap();
+}
+
+/**
+ * Fills the map with rooms
+ */
+function fillMap() {
     //Fills up the map with empty cells
     addCells();
 
     //Generate the middle room
     newRoom([Math.floor(mapWidth / 2), Math.floor(mapHeight / 2)]);
     
-    //Generate three rooms outside of the middle room
+    //Generate four rooms outside of the middle room
     if(addDoor(rooms[0])) {
-        console.log(1)
-        newRoom(getOutside(rooms[0].availableDoors[0]));
+        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
         rooms[0].availableDoors.shift();
     }
 
     if(addDoor(rooms[0])) {
-        console.log(2)
-        newRoom(getOutside(rooms[0].availableDoors[0]));
+        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
         rooms[0].availableDoors.shift();
     }
 
     if(addDoor(rooms[0])) {
-        console.log(3)
-        newRoom(getOutside(rooms[0].availableDoors[0]));
+        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
         rooms[0].availableDoors.shift();
     }
+
+    if(addDoor(rooms[0])) {
+        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
+        rooms[0].availableDoors.shift();
+    }
+
+    //Generate one more room outside of two rooms
+    if(addDoor(rooms[rooms.length - 2])) {
+        newRoom(getOutside(rooms[rooms.length - 2].availableDoors[0]), rooms[rooms.length - 2].availableDoors[0]);
+        rooms[rooms.length - 1].availableDoors.shift();
+    }
+
+    if(addDoor(rooms[rooms.length - 2])) {
+        newRoom(getOutside(rooms[rooms.length - 2].availableDoors[0]), rooms[rooms.length - 2].availableDoors[0]);
+        rooms[rooms.length - 1].availableDoors.shift();
+    }
+
+    //Generate one more room outside of the most recent room
+    if(addDoor(rooms[rooms.length - 1])) {
+        newRoom(getOutside(rooms[rooms.length - 1].availableDoors[0]), rooms[rooms.length - 1].availableDoors[0]);
+        rooms[rooms.length - 1].availableDoors.shift();
+    }
+}
+
+function resetMap() {
+    clearMap();
+    mapCells = [];
+    mapData = [];
+    rooms = [];
+    seed = Math.random();
+    seededRandom = new Math.seedrandom(seed);
+    fillMap();
 }
 
 /**
@@ -120,8 +158,12 @@ function addCells() {
  * Gets the room tile at any coordinate, but with less information
  */
 function getTile(x, y) {
-    var tile = mapData[y][x];
-    return tile;
+    if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
+        var tile = mapData[y][x];
+        return tile;
+    } else {
+        return -1;
+    }
 }
 
 /**
@@ -135,11 +177,12 @@ function selectRandomTile(room) {
  * Selects a random floor tile
  */
 function selectRandomFloor(room) {
-    var tile = selectRandomTile(room)
-    if (tile.type == TILES.FLOOR || tile.type == TILES.FLOOR_EDGE) {
-        return tile;
-    } else {
-        //TODO Get this to always find a floor tile
+    var tile = null;
+    while (true) {
+        tile = selectRandomTile(room);
+        if (tile.type == TILES.FLOOR || tile.type == TILES.FLOOR_EDGE) {
+            return tile;
+        }
     }
 }
 
@@ -158,7 +201,7 @@ function getRoomTile(room, x, y) {
 /**
  * Sets a room's tile, checking for existing tiles
  */
-function setRoomTile(room, x, y, type) {
+function setRoomTile(room, x, y, type, override = false) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
         //Never override a door
         if (getTile(x, y).type == TILES.DOOR) {
@@ -266,6 +309,21 @@ function addDoor(room, retry = false) {
 }
 
 /**
+ * Removes a door from the map
+ */
+function removeDoor(coords) {
+    //Remove it from the room
+    var room = getTile(coords[0], coords[1]).room;
+    var doorTile = getRoomTile(rooms[room], coords[0], coords[1]);
+    rooms[room].tiles.splice(rooms[room].tiles.indexOf(doorTile), 1);
+    rooms[room].tiles.push({x: coords[0], y: coords[1], type: TILES.WALL});
+
+    //Remove it from the map
+    mapData[coords[1]][coords[0]].type = TILES.WALL;
+    mapCells[coords[1]][coords[0]].style.backgroundColor = TILES.WALL;
+}
+
+/**
  * Returns the location of an empty tile next to a location, if there are none, returns -1
  */
 function getOutside(location) {
@@ -289,7 +347,7 @@ function getOutside(location) {
  * 
  * @param coords the x and y coordinates to start generating the room at
  */
-function newRoom(coords) {
+function newRoom(coords, parentDoor = -1) {
     var room = {
         x: coords[0],
         y: coords[1],
@@ -298,6 +356,7 @@ function newRoom(coords) {
         tiles: [],
         openWalls: [],
         availableDoors: [],
+        parentDoor: parentDoor,
         id: rooms.length
     }
     room.steps = Math.max(room.baseWidth + room.baseHeight, roomSize * (1 - seededRandom() * variance));
@@ -397,8 +456,14 @@ function buildRoom(room) {
             mapData[tile.y][tile.x].room = room.id;
         }
         rooms[room.id] = room;
+        buildAttempts = 0;
     } else {
-        newRoom([room.x, room.y]);
+        if (buildAttempts <= 10) {
+            buildAttempts++;
+            newRoom([room.x, room.y], room.parentDoor);
+        } else {
+            removeDoor(room.parentDoor);
+        }
     }
 }
 
