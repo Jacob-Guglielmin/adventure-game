@@ -2,6 +2,7 @@
 
 var mapContainer = document.getElementById("mapContainer"),
 mapCells = [],
+rooms = [],
 
 seed = null,
 seededRandom = null,
@@ -9,10 +10,15 @@ seededRandom = null,
 mapWidth = 50,
 mapHeight = 30,
 
+//Tile types
+TILE_WALL = "#ff0000",
+TILE_FLOOR_EDGE = "#00ff00",
+TILE_FLOOR = "#ffffff",
+
 //CONFIG VALUES
 variance = 0.2,
 
-roomSize = ((mapWidth + mapHeight) / 2) / 8,
+roomSize = ((mapWidth + mapHeight) / 2) / 7,
 
 branches = 4;
 
@@ -74,6 +80,41 @@ function selectRandomTile(room) {
 }
 
 /**
+ * Gets the tile at a specific coordinate in a room
+ */
+function getRoomTile(room, x, y) {
+    for (const tile of room.tiles) {
+        if (tile.x == x && tile.y == y) {
+            return tile;
+        }
+    }
+    return -1;
+}
+
+/**
+ * Sets a room's tile, checking for existing tiles
+ */
+function setRoomTile(room, x, y, type) {
+    var oldTile = getRoomTile(room, x, y);
+    if (oldTile != -1) {
+        var oldTileType = oldTile.type;
+    } else {
+        var oldTileType = -1;
+    }
+    if (oldTileType != -1) { 
+        if (type == TILE_WALL) {
+            return;
+        } else if (type == TILE_FLOOR_EDGE && oldTileType == TILE_FLOOR) {
+            return;
+        } else {
+            room.tiles.push({x: x, y: y, type: type});
+        }
+    } else {
+        room.tiles.push({x: x, y: y, type: type});
+    }
+}
+
+/**
  * Creates a new room object
  * 
  * @param x the x coordinate to start generating the room at
@@ -83,11 +124,12 @@ function newRoom(x, y) {
     var room = {
         x: x,
         y: y,
-        width: randomBetween(3, roomSize),
-        height: randomBetween(3, roomSize),
-        tiles: []
+        baseWidth: randomBetween(3, roomSize),
+        baseHeight: randomBetween(3, roomSize),
+        tiles: [],
+        id: rooms.length
     }
-    room.steps = Math.max(room.width + room.height, roomSize * (1 - seededRandom() * variance));
+    room.steps = Math.max(room.baseWidth + room.baseHeight, roomSize * (1 - seededRandom() * variance));
 
     planRoom(room);
 }
@@ -96,8 +138,8 @@ function newRoom(x, y) {
  * Plans a room in terms of shape
  */
 function planRoom(room) {
-    var width = room.width,
-    height = room.height,
+    var width = room.baseWidth,
+    height = room.baseHeight,
     mustExpand = [];
     
     //Add expansion in both directions to make a rectangle
@@ -154,11 +196,24 @@ function planRoom(room) {
  * Constructs the room in tiles
  */
 function selectRoomTiles(room, startX, startY, expandX, expandY) {
-    for (let i = startX; i < expandX + startX; i++) {
-        for (let o = startY; o < expandY + startY; o++) {
-            room.tiles.push({x: i, y: o});
+    var x = 0, y = 0;
+    for (x = startX - 1; x < expandX + startX + 1; x++) {
+        for (y = startY - 1; y < expandY + startY + 1; y++) {
+            setRoomTile(room, x, y, TILE_WALL);
         }
     }
+    for (x = startX; x < expandX + startX; x++) {
+        for (y = startY; y < expandY + startY; y++) {
+            setRoomTile(room, x, y, TILE_FLOOR_EDGE);
+        }
+    }
+    for (x = startX + 1; x < expandX + startX - 1; x++) {
+        for (y = startY + 1; y < expandY + startY - 1; y++) {
+            setRoomTile(room, x, y, TILE_FLOOR);
+        }
+    }
+
+    
 }
 
 /**
@@ -166,8 +221,9 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
  */
 function buildRoom(room) {
     for (const tile of room.tiles) {
-        mapCells[tile.y][tile.x].style.backgroundColor = "#ffffff";
+        mapCells[tile.y][tile.x].style.backgroundColor = tile.type;
     }
+    rooms[room.id] = room;
 }
 
 /**
