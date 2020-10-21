@@ -11,9 +11,12 @@ mapWidth = 50,
 mapHeight = 30,
 
 //Tile types
-TILE_WALL = "#ff0000",
-TILE_FLOOR_EDGE = "#00ff00",
-TILE_FLOOR = "#ffffff",
+TILES = {
+    WALL: "#ff0000",
+    DOOR: "#0000ff",
+    FLOOR_EDGE: "#00ff00",
+    FLOOR: "#ffffff"
+},
 
 //CONFIG VALUES
 variance = 0.2,
@@ -54,6 +57,18 @@ function randomBetween(min, max) {
  */
 function randomFromArray(array) {
     return array[randomBetween(0, array.length - 1)];
+}
+
+/**
+ * Determines if two arrays are the same
+ */
+function compareArrays(a, b) {
+    if (a == null || b == null) return false;
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
 }
 
 /**
@@ -101,17 +116,57 @@ function setRoomTile(room, x, y, type) {
     } else {
         var oldTileType = -1;
     }
-    if (oldTileType != -1) { 
-        if (type == TILE_WALL) {
+    if (oldTileType != -1) {
+        //Never override anything with a wall
+        if (type == TILES.WALL) {
             return;
-        } else if (type == TILE_FLOOR_EDGE && oldTileType == TILE_FLOOR) {
+        //Never override a floor
+        } else if (oldTileType == TILES.FLOOR) {
             return;
+        //Override anything else, and remove the old copy of the tile from the room
         } else {
+            room.tiles.splice(room.tiles.indexOf(oldTile), 1);
             room.tiles.push({x: x, y: y, type: type});
         }
     } else {
         room.tiles.push({x: x, y: y, type: type});
     }
+}
+
+/**
+ * Finds all tiles that would be a good door
+ */
+function checkForDoors(room) {
+    var goodTiles = [];
+    for (const tile of room.tiles) {
+        if (tile.type == TILES.WALL) {
+            var adjacentWalls = [];
+            if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL) {
+                adjacentWalls.push(1);
+            }
+            if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL) {
+                adjacentWalls.push(2);
+            }
+            if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL) {
+                adjacentWalls.push(3);
+            }
+            if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL) {
+                adjacentWalls.push(4);
+            }
+            if (compareArrays(adjacentWalls, [1, 3]) || compareArrays(adjacentWalls, [2, 4])) {
+                goodTiles.push(tile);
+            }
+        }
+    }
+    return goodTiles;
+}
+
+/**
+ * Adds a door to a room
+ */
+function addDoor(room) {
+    var tile = randomFromArray(checkForDoors(room));
+    setRoomTile(room, tile.x, tile.y, TILES.DOOR);
 }
 
 /**
@@ -188,7 +243,7 @@ function planRoom(room) {
             selectRoomTiles(room, startX, startY, expandX, expandY);
         }  
     }
-
+    addDoor(room);
     buildRoom(room);
 }
 
@@ -199,21 +254,19 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
     var x = 0, y = 0;
     for (x = startX - 1; x < expandX + startX + 1; x++) {
         for (y = startY - 1; y < expandY + startY + 1; y++) {
-            setRoomTile(room, x, y, TILE_WALL);
+            setRoomTile(room, x, y, TILES.WALL);
         }
     }
     for (x = startX; x < expandX + startX; x++) {
         for (y = startY; y < expandY + startY; y++) {
-            setRoomTile(room, x, y, TILE_FLOOR_EDGE);
+            setRoomTile(room, x, y, TILES.FLOOR_EDGE);
         }
     }
     for (x = startX + 1; x < expandX + startX - 1; x++) {
         for (y = startY + 1; y < expandY + startY - 1; y++) {
-            setRoomTile(room, x, y, TILE_FLOOR);
+            setRoomTile(room, x, y, TILES.FLOOR);
         }
     }
-
-    
 }
 
 /**
