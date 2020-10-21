@@ -2,6 +2,7 @@
 
 var mapContainer = document.getElementById("mapContainer"),
 mapCells = [],
+mapData = [],
 rooms = [],
 
 seed = null,
@@ -12,6 +13,7 @@ mapHeight = 30,
 
 //Tile types
 TILES = {
+    EMPTY: "#000000",
     WALL: "#ff0000",
     DOOR: "#0000ff",
     FLOOR_EDGE: "#00ff00",
@@ -42,7 +44,28 @@ function init() {
 
     //Fills up the map with empty cells
     addCells();
-    newRoom(Math.floor(mapWidth / 2), Math.floor(mapHeight / 2));
+
+    //Generate the middle room
+    newRoom([Math.floor(mapWidth / 2), Math.floor(mapHeight / 2)]);
+    
+    //Generate three rooms outside of the middle room
+    if(addDoor(rooms[0])) {
+        console.log(1)
+        newRoom(getOutside(rooms[0].availableDoors[0]));
+        rooms[0].availableDoors.shift();
+    }
+
+    if(addDoor(rooms[0])) {
+        console.log(2)
+        newRoom(getOutside(rooms[0].availableDoors[0]));
+        rooms[0].availableDoors.shift();
+    }
+
+    if(addDoor(rooms[0])) {
+        console.log(3)
+        newRoom(getOutside(rooms[0].availableDoors[0]));
+        rooms[0].availableDoors.shift();
+    }
 }
 
 /**
@@ -85,6 +108,20 @@ function addCells() {
             mapContainer.appendChild(mapCells[i][o]);
         }
     }
+    for (let i = 0; i < mapHeight; i++) {
+        mapData[i] = [];
+        for (let o = 0; o < mapWidth; o++) {
+            mapData[i][o] = {type: TILES.EMPTY, room: -1};
+        }
+    }
+}
+
+/**
+ * Gets the room tile at any coordinate, but with less information
+ */
+function getTile(x, y) {
+    var tile = mapData[y][x];
+    return tile;
 }
 
 /**
@@ -92,6 +129,18 @@ function addCells() {
  */
 function selectRandomTile(room) {
     return randomFromArray(room.tiles);
+}
+
+/**
+ * Selects a random floor tile
+ */
+function selectRandomFloor(room) {
+    var tile = selectRandomTile(room)
+    if (tile.type == TILES.FLOOR || tile.type == TILES.FLOOR_EDGE) {
+        return tile;
+    } else {
+        //TODO Get this to always find a floor tile
+    }
 }
 
 /**
@@ -110,27 +159,47 @@ function getRoomTile(room, x, y) {
  * Sets a room's tile, checking for existing tiles
  */
 function setRoomTile(room, x, y, type) {
-    var oldTile = getRoomTile(room, x, y);
-    if (oldTile != -1) {
-        var oldTileType = oldTile.type;
-    } else {
-        var oldTileType = -1;
-    }
-    if (oldTileType != -1) {
-        //Never override anything with a wall
-        if (type == TILES.WALL) {
+    if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
+        //Never override a door
+        if (getTile(x, y).type == TILES.DOOR) {
             return;
-        //Never override a floor
-        } else if (oldTileType == TILES.FLOOR) {
-            return;
-        //Override anything else, and remove the old copy of the tile from the room
+        }
+        var oldTile = getRoomTile(room, x, y);
+        if (oldTile != -1) {
+            var oldTileType = oldTile.type;
         } else {
-            room.tiles.splice(room.tiles.indexOf(oldTile), 1);
+            var oldTileType = -1;
+        }
+        if (oldTileType != -1) {
+            //Never override anything with a wall
+            if (type == TILES.WALL) {
+                return;
+            //Never override a floor
+            } else if (oldTileType == TILES.FLOOR || oldTileType == TILES.DOOR) {
+                return;
+            //Override anything else, and remove the old copy of the tile from the room
+            } else {
+                room.tiles.splice(room.tiles.indexOf(oldTile), 1);
+                room.tiles.push({x: x, y: y, type: type});
+            }
+        } else {
             room.tiles.push({x: x, y: y, type: type});
         }
-    } else {
-        room.tiles.push({x: x, y: y, type: type});
     }
+}
+
+/**
+ * Checks to see if any tiles are in the way of the planned expansion
+ */
+function canExtendRoom(startX, startY, expandX, expandY) {
+    for (let x = startX; x < expandX + startX; x++) {
+        for (let y = startY; y < expandY + startY; y++) {
+            if (x <= 0 || y <= 0 || x >= mapWidth - 1 || y >= mapHeight - 1 || getTile(x, y).type != TILES.EMPTY) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /**
@@ -158,30 +227,77 @@ function checkForDoors(room) {
             }
         }
     }
-    return goodTiles;
+    room.openWalls = goodTiles;
 }
 
 /**
  * Adds a door to a room
  */
-function addDoor(room) {
-    var tile = randomFromArray(checkForDoors(room));
-    setRoomTile(room, tile.x, tile.y, TILES.DOOR);
+function addDoor(room, retry = false) {
+    //Don't refresh the list if this is a retry
+    if (!retry) {
+        checkForDoors(room);
+    }
+    var tile = randomFromArray(room.openWalls);
+    //Check to see if that door is valid
+    if (getOutside([tile.x, tile.y]) != -1) {
+        //Add the door
+        setRoomTile(room, tile.x, tile.y, TILES.DOOR);
+        mapCells[tile.y][tile.x].style.backgroundColor = TILES.DOOR;
+        mapData[tile.y][tile.x].type = TILES.DOOR;
+        room.availableDoors.push([tile.x, tile.y]);
+        //The door was successfully placed
+        return true;
+    } else {
+        //Try again
+        room.openWalls.splice(room.openWalls.indexOf(tile), 1);
+        if (room.openWalls.length != 0) {
+            //This is recursive, but it should end eventually
+            if(addDoor(room, true)) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            //There are no valid door locations in this room
+            return false;
+        }
+    }
+}
+
+/**
+ * Returns the location of an empty tile next to a location, if there are none, returns -1
+ */
+function getOutside(location) {
+    if (getTile(location[0], location[1] - 1).type == TILES.EMPTY) {
+        return [location[0], location[1] - 1];
+    }
+    if (getTile(location[0] + 1, location[1]).type == TILES.EMPTY) {
+        return [location[0] + 1, location[1]];
+    }
+    if (getTile(location[0], location[1] + 1).type == TILES.EMPTY) {
+        return [location[0], location[1] + 1];
+    }
+    if (getTile(location[0] - 1, location[1]).type == TILES.EMPTY) {
+        return [location[0] - 1, location[1]];
+    }
+    return -1;
 }
 
 /**
  * Creates a new room object
  * 
- * @param x the x coordinate to start generating the room at
- * @param y the y coordinate to start generating the room at
+ * @param coords the x and y coordinates to start generating the room at
  */
-function newRoom(x, y) {
+function newRoom(coords) {
     var room = {
-        x: x,
-        y: y,
+        x: coords[0],
+        y: coords[1],
         baseWidth: randomBetween(3, roomSize),
         baseHeight: randomBetween(3, roomSize),
         tiles: [],
+        openWalls: [],
+        availableDoors: [],
         id: rooms.length
     }
     room.steps = Math.max(room.baseWidth + room.baseHeight, roomSize * (1 - seededRandom() * variance));
@@ -212,7 +328,7 @@ function planRoom(room) {
     for (let i = 0; i < branches; i++) {
         var startX = room.x, startY = room.y, expandX = 1, expandY = 1;
         if (room.tiles.length != 0) {
-            var randomTile = selectRandomTile(room);
+            var randomTile = selectRandomFloor(room);
             startX = randomTile.x;
             startY = randomTile.y;
         }
@@ -220,8 +336,8 @@ function planRoom(room) {
             //Select a side to expand, priority is on sides that need to be expanded
             var sideToExpand = randomBetween(1, 4);
             if (mustExpand.length != 0) {
-                sideToExpand = mustExpand[0];
-                mustExpand.shift();
+                sideToExpand = randomFromArray(mustExpand);
+                mustExpand.splice(mustExpand.indexOf(sideToExpand), 1);
             }
             switch (sideToExpand) {
                 case 1:
@@ -240,10 +356,11 @@ function planRoom(room) {
                 default:
                     break;
             }
-            selectRoomTiles(room, startX, startY, expandX, expandY);
+            if (canExtendRoom(startX, startY, expandX, expandY)) {
+                selectRoomTiles(room, startX, startY, expandX, expandY);
+            }
         }  
     }
-    addDoor(room);
     buildRoom(room);
 }
 
@@ -273,10 +390,16 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
  * Places a room on the map
  */
 function buildRoom(room) {
-    for (const tile of room.tiles) {
-        mapCells[tile.y][tile.x].style.backgroundColor = tile.type;
+    if (room.tiles.length > 30) {
+        for (const tile of room.tiles) {
+            mapCells[tile.y][tile.x].style.backgroundColor = tile.type;
+            mapData[tile.y][tile.x].type = tile.type;
+            mapData[tile.y][tile.x].room = room.id;
+        }
+        rooms[room.id] = room;
+    } else {
+        newRoom([room.x, room.y]);
     }
-    rooms[room.id] = room;
 }
 
 /**
