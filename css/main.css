@@ -3,6 +3,6 @@ body {
     background-color: #444444;
 }
 
-#mapContainer {
+#gameCanvas {
     border: 1px solid black;
 }
