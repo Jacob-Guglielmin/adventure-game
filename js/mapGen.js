@@ -1,7 +1,7 @@
 "use strict";
 
 var mapContainer = document.getElementById("mapContainer"),
-mapCells = [],
+mapRenderer = mapContainer.getContext("2d"),
 mapData = [],
 rooms = [],
 
@@ -46,8 +46,8 @@ function init() {
     seededRandom = new Math.seedrandom(seed);
 
     //Resizes the map container to fit the map
-    mapContainer.style.width = (mapWidth * 20) + "px";
-    mapContainer.style.height = (mapHeight * 20) + "px";
+    mapRenderer.canvas.width = mapWidth * 20;
+    mapRenderer.canvas.height = mapHeight * 20;
 
     fillMap();
 }
@@ -118,7 +118,6 @@ function fillMap() {
 
 function resetMap() {
     clearMap();
-    mapCells = [];
     mapData = [];
     rooms = [];
     seed = Math.random();
@@ -153,19 +152,9 @@ function compareArrays(a, b) {
 }
 
 /**
- * Populates the map with empty divs
+ * Populates the map with empty squares
  */
 function addCells() {
-    for (let i = 0; i < mapHeight; i++) {
-        mapCells[i] = [];
-        for (let o = 0; o < mapWidth; o++) {
-            mapCells[i][o] = document.createElement("div");
-            mapCells[i][o].style.width = "20px";
-            mapCells[i][o].style.height = "20px";
-            mapCells[i][o].classList.add("mapCell");
-            mapContainer.appendChild(mapCells[i][o]);
-        }
-    }
     for (let i = 0; i < mapHeight; i++) {
         mapData[i] = [];
         for (let o = 0; o < mapWidth; o++) {
@@ -306,7 +295,7 @@ function addDoor(room, retry = false) {
     if (getOutside([tile.x, tile.y]) != -1) {
         //Add the door
         setRoomTile(room, tile.x, tile.y, TILES.DOOR);
-        mapCells[tile.y][tile.x].style.backgroundColor = TILES.DOOR;
+        drawCell(tile.x, tile.y, TILES.DOOR);
         mapData[tile.y][tile.x].type = TILES.DOOR;
         room.availableDoors.push([tile.x, tile.y]);
         //The door was successfully placed
@@ -456,7 +445,7 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
 function buildRoom(room) {
     if (room.tiles.length > 30) {
         for (const tile of room.tiles) {
-            mapCells[tile.y][tile.x].style.backgroundColor = tile.type;
+            drawCell(tile.x, tile.y, tile.type);
             mapData[tile.y][tile.x].type = tile.type;
             mapData[tile.y][tile.x].room = room.id;
         }
@@ -470,11 +459,16 @@ function buildRoom(room) {
     }
 }
 
+function drawCell(x, y, color) {
+    mapRenderer.fillStyle = color;
+    mapRenderer.fillRect(x * 20, y * 20, 20, 20);
+}
+
 /**
  * Deletes the map
  */
 function clearMap() {
-    mapContainer.textContent = "";
+    mapRenderer.clearRect(0, 0, mapContainer.width, mapContainer.height);
 }
 
 init();
