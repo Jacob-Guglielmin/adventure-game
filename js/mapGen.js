@@ -1,7 +1,7 @@
 "use strict";
 
-var gameCanvas = document.getElementById("gameCanvas"),
-renderer = gameCanvas.getContext("2d"),
+var mapCanvas = document.getElementById("mapCanvas"),
+mapRenderer = mapCanvas.getContext("2d"),
 mapData = [],
 rooms = [],
 
@@ -15,7 +15,8 @@ buildAttempts = 0,
 
 //Tile types
 TILES = {
-    EMPTY: "#000000",
+    PLAYER: "#000000",
+    EMPTY: "#444444",
     WALL: "#ff0000",
     DOOR: "#0000ff",
     FLOOR_EDGE: "#00ff00",
@@ -151,6 +152,12 @@ function compareArrays(a, b) {
  * Populates the map with empty squares
  */
 function addCells() {
+    for (let i = 0; i < mapHeight; i++) {
+        mapData[i] = [];
+        for (let o = 0; o < mapWidth; o++) {
+            drawMapCell(o, i, TILES.EMPTY);
+        }
+    }
     for (let i = 0; i < mapHeight; i++) {
         mapData[i] = [];
         for (let o = 0; o < mapWidth; o++) {
@@ -291,7 +298,7 @@ function addDoor(room, retry = false) {
     if (getOutside([tile.x, tile.y]) != -1) {
         //Add the door
         setRoomTile(room, tile.x, tile.y, TILES.DOOR);
-        drawCell(tile.x, tile.y, TILES.DOOR);
+        drawMapCell(tile.x, tile.y, TILES.DOOR);
         mapData[tile.y][tile.x].type = TILES.DOOR;
         room.availableDoors.push([tile.x, tile.y]);
         //The door was successfully placed
@@ -441,7 +448,7 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
 function buildRoom(room) {
     if (room.tiles.length > 30) {
         for (const tile of room.tiles) {
-            drawCell(tile.x, tile.y, tile.type);
+            drawMapCell(tile.x, tile.y, tile.type);
             mapData[tile.y][tile.x].type = tile.type;
             mapData[tile.y][tile.x].room = room.id;
         }
@@ -458,14 +465,14 @@ function buildRoom(room) {
 /**
  * Draws a cell on the map
  */
-function drawCell(x, y, color) {
-    renderer.fillStyle = color;
-    renderer.fillRect(x * 20, y * 20, 20, 20);
+function drawMapCell(x, y, color) {
+    mapRenderer.fillStyle = color;
+    mapRenderer.fillRect(x * 20, y * 20, 20, 20);
 }
 
 /**
  * Deletes the map
  */
 function clearMap() {
-    renderer.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+    mapRenderer.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
 }

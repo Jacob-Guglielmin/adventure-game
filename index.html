@@ -6,8 +6,11 @@
         <link href="css/main.css" rel="stylesheet">
     </head>
     <body>
-        <canvas id="gameCanvas"></canvas>
-        <button onclick="resetMap();">Reset</button>
+        <div id="game">
+            <canvas id="mapCanvas"></canvas>
+            <canvas id="playerCanvas"></canvas>
+        </div>
+        <button onclick="reset();">Reset</button>
         <script src="js/mapGen.js"></script>
         <script src="js/gameplay.js"></script>
     </body>
