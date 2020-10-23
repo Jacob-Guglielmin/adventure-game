@@ -4,7 +4,9 @@ playerRenderer = playerCanvas.getContext("2d"),
 coords = [0, 0],
 
 animationStart = undefined,
-canMove = true;
+canMove = true,
+
+keysPressed = [];
 
 /**
  * Create a map, add the player, and add key events to the canvas
@@ -25,7 +27,8 @@ function init() {
 
     drawPlayer(coords[0], coords[1]);
 
-    document.addEventListener("keydown", keyHandler)
+    document.addEventListener("keydown", keyHandler);
+    document.addEventListener("keyup", keyUpHandler);
 }
 
 /**
@@ -45,30 +48,43 @@ function reset() {
  */
 function keyHandler(e) {
     var key = e.keyCode
-    switch (true) {
-        //Up arrow or W
-        case key == 38 || key == 87:
-            movePlayer(0);
-            break;
-    
-        //Right arrow or D
-        case key == 39 || key == 68:
-            movePlayer(1);
-            break;
 
-        //Down arrow or S
-        case key == 40 || key == 83:
-            movePlayer(2);
-            break;
+    if (keysPressed.indexOf(key) == -1) {
+        keysPressed.push(key);
+        switch (true) {
+            //Up arrow or W
+            case key == 38 || key == 87:
+                movePlayer(0);
+                break;
+        
+            //Right arrow or D
+            case key == 39 || key == 68:
+                movePlayer(1);
+                break;
 
-        //Left arrow or A
-        case key == 37 || key == 65:
-            movePlayer(3);
-            break;
+            //Down arrow or S
+            case key == 40 || key == 83:
+                movePlayer(2);
+                break;
 
-        default:
-            console.warn("Key not recognized with keycode " + key);
-            break;
+            //Left arrow or A
+            case key == 37 || key == 65:
+                movePlayer(3);
+                break;
+
+            default:
+                console.warn("Key not recognized with keycode " + key);
+                break;
+        }
+    }
+}
+
+/**
+ * Allows keys to work again after they are pressed down
+ */
+function keyUpHandler(e) {
+    if (keysPressed.indexOf(e.keyCode) != -1) {
+        keysPressed.splice(keysPressed.indexOf(e.keyCode), 1);
     }
 }
 
