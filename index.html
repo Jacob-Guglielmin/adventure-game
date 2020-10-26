@@ -8,9 +8,13 @@
     <body>
         <div id="game">
             <canvas id="mapCanvas"></canvas>
+            <canvas id="overlayCanvas"></canvas>
             <canvas id="playerCanvas"></canvas>
         </div>
-        <button onclick="reset();">Reset</button>
+        <script>
+            var imageLoaded = false;
+        </script>
+        <img id="tiles" src="img/tiles.png" onload="imageLoaded = true;" style="display: none; visibility: hidden;">
         <script src="js/mapGen.js"></script>
         <script src="js/gameplay.js"></script>
     </body>

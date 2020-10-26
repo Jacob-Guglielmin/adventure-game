@@ -1,6 +1,7 @@
 "use strict";
 var playerCanvas = document.getElementById("playerCanvas"),
 playerRenderer = playerCanvas.getContext("2d"),
+
 coords = [0, 0],
 
 animationStart = undefined,
@@ -15,10 +16,10 @@ function init() {
     //Resizes the canvases to fit the map
     mapRenderer.canvas.width = mapWidth * 20;
     mapRenderer.canvas.height = mapHeight * 20;
+    overlayRenderer.canvas.width = mapWidth * 20;
+    overlayRenderer.canvas.height = mapHeight * 20;
     playerRenderer.canvas.width = mapWidth * 20;
     playerRenderer.canvas.height = mapHeight * 20;
-
-    playerRenderer.fillStyle = TILES.PLAYER;
 
     mapGenInit();
 
@@ -36,6 +37,8 @@ function init() {
  */
 function reset() {
     resetMap();
+
+    clearPlayer();
 
     coords[0] = rooms[0].x;
     coords[1] = rooms[0].y;
@@ -121,7 +124,7 @@ function movePlayer(direction, oldCoords) {
 
     if (canMove) {
         switch (true) {
-            case newTile.type == TILES.FLOOR || newTile.type == TILES.FLOOR_EDGE || newTile.type == TILES.DOOR:
+            case newTile.type == TILES.FLOOR || newTile.type == TILES.FLOOR_EDGE || newTile.type == TILES.DOOR_HORIZONTAL:
                 requestAnimationFrame(function(timestamp) {
                     animatePlayer(timestamp, oldCoords, 0);
                 });
@@ -178,7 +181,7 @@ function animatePlayer(timeStamp, oldCoords, moveType) {
  * Draws the player onto the canvas
  */
 function drawPlayer(x, y) {
-    playerRenderer.fillRect(Math.floor(x * 20), Math.floor(y * 20), 20, 20);
+    playerRenderer.drawImage(document.getElementById("tiles"), 0, TILES.PLAYER, 20, 20, Math.floor(x * 20), Math.floor(y * 20), 20, 20);
 }
 
 /**
@@ -188,4 +191,9 @@ function clearPlayer() {
     playerRenderer.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
 }
 
-init();
+var loadInterval = setInterval(() => {
+    if (imageLoaded) {
+        clearInterval(loadInterval);
+        init();
+    }
+}, 10);

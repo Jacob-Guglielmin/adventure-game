@@ -2,6 +2,8 @@
 
 var mapCanvas = document.getElementById("mapCanvas"),
 mapRenderer = mapCanvas.getContext("2d"),
+overlayCanvas = document.getElementById("overlayCanvas"),
+overlayRenderer = overlayCanvas.getContext("2d"),
 mapData = [],
 rooms = [],
 
@@ -15,12 +17,15 @@ buildAttempts = 0,
 
 //Tile types
 TILES = {
-    PLAYER: "#000000",
-    EMPTY: "#444444",
-    WALL: "#ff0000",
-    DOOR: "#0000ff",
-    FLOOR_EDGE: "#00ff00",
-    FLOOR: "#ffffff"
+    EMPTY: 0,
+    PLAYER: 20,
+    WALL_CORNER: 40,
+    WALL_HORIZONTAL: 60,
+    WALL_VERTICAL: 80,
+    DOOR_HORIZONTAL: 100,
+    DOOR_VERTICAL: 120,
+    FLOOR_EDGE: 140,
+    FLOOR: 160
 },
 
 //CONFIG VALUES
@@ -35,7 +40,9 @@ decorationRatios = {
     grass: 0.3,
 };
 
-//Seeded random function, many thanks to David Bau (http://davidbau.com/archives/2010/01/30/random_seeds_coded_hints_and_quintillions.html)
+/**
+ * Seeded random function, many thanks to David Bau (http://davidbau.com/archives/2010/01/30/random_seeds_coded_hints_and_quintillions.html)
+ */
 !function(f,a,c){var s,l=256,p="random",d=c.pow(l,6),g=c.pow(2,52),y=2*g,h=l-1;function n(n,t,r){function e(){for(var n=u.g(6),t=d,r=0;n<g;)n=(n+r)*l,t*=l,r=u.g(1);for(;y<=n;)n/=2,t/=2,r>>>=1;return(n+r)/t}var o=[],i=j(function n(t,r){var e,o=[],i=typeof t;if(r&&"object"==i)for(e in t)try{o.push(n(t[e],r-1))}catch(n){}return o.length?o:"string"==i?t:t+"\0"}((t=1==t?{entropy:!0}:t||{}).entropy?[n,S(a)]:null==n?function(){try{var n;return s&&(n=s.randomBytes)?n=n(l):(n=new Uint8Array(l),(f.crypto||f.msCrypto).getRandomValues(n)),S(n)}catch(n){var t=f.navigator,r=t&&t.plugins;return[+new Date,f,r,f.screen,S(a)]}}():n,3),o),u=new m(o);return e.int32=function(){return 0|u.g(4)},e.quick=function(){return u.g(4)/4294967296},e.double=e,j(S(u.S),a),(t.pass||r||function(n,t,r,e){return e&&(e.S&&v(e,u),n.state=function(){return v(u,{})}),r?(c[p]=n,t):n})(e,i,"global"in t?t.global:this==c,t.state)}function m(n){var t,r=n.length,u=this,e=0,o=u.i=u.j=0,i=u.S=[];for(r||(n=[r++]);e<l;)i[e]=e++;for(e=0;e<l;e++)i[e]=i[o=h&o+n[e%r]+(t=i[e])],i[o]=t;(u.g=function(n){for(var t,r=0,e=u.i,o=u.j,i=u.S;n--;)t=i[e=h&e+1],r=r*l+i[h&(i[e]=i[o=h&o+t])+(i[o]=t)];return u.i=e,u.j=o,r})(l)}function v(n,t){return t.i=n.i,t.j=n.j,t.S=n.S.slice(),t}function j(n,t){for(var r,e=n+"",o=0;o<e.length;)t[h&o]=h&(r^=19*t[h&o])+e.charCodeAt(o++);return S(t)}function S(n){return String.fromCharCode.apply(0,n)}if(j(c.random(),a),"object"==typeof module&&module.exports){module.exports=n;try{s=require("crypto")}catch(n){}}else"function"==typeof define&&define.amd?define(function(){return n}):c["seed"+p]=n}("undefined"!=typeof self?self:this,[],Math);
 
 /**
@@ -167,7 +174,7 @@ function addCells() {
 }
 
 /**
- * Gets the room tile at any coordinate, but with less information
+ * Gets the room tile at any coordinate
  */
 function getTile(x, y) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
@@ -211,12 +218,34 @@ function getRoomTile(room, x, y) {
 }
 
 /**
+ * Identifies which of the neighbouring cells are of a specific type.
+ * Returns 1 for up-down, 2 for left-right, 0 for all or none
+ */
+function getConnecting(x, y, type) {
+    var connections = 0;
+
+    if (getTile(x, y - 1).type == type && getTile(x, y + 1).type == type) {
+        connections += 1;
+    }
+
+    if (getTile(x - 1, y).type == type && getTile(x + 1, y).type == type) {
+        connections += 2;
+    }
+
+    if (connections == 3 || connections == 0) {
+        return 0;
+    } else {
+        return connections;
+    }
+}
+
+/**
  * Sets a room's tile, checking for existing tiles
  */
 function setRoomTile(room, x, y, type, override = false) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
         //Never override a door
-        if (getTile(x, y).type == TILES.DOOR) {
+        if (getTile(x, y).type == TILES.DOOR_HORIZONTAL) {
             return;
         }
         var oldTile = getRoomTile(room, x, y);
@@ -227,10 +256,10 @@ function setRoomTile(room, x, y, type, override = false) {
         }
         if (oldTileType != -1) {
             //Never override anything with a wall
-            if (type == TILES.WALL) {
+            if (type == TILES.WALL_CORNER) {
                 return;
             //Never override a floor
-            } else if (oldTileType == TILES.FLOOR || oldTileType == TILES.DOOR) {
+            } else if (oldTileType == TILES.FLOOR || oldTileType == TILES.DOOR_HORIZONTAL) {
                 return;
             //Override anything else, and remove the old copy of the tile from the room
             } else {
@@ -263,18 +292,18 @@ function canExtendRoom(startX, startY, expandX, expandY) {
 function checkForDoors(room) {
     var goodTiles = [];
     for (const tile of room.tiles) {
-        if (tile.type == TILES.WALL) {
+        if (tile.type == TILES.WALL_CORNER) {
             var adjacentWalls = [];
-            if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL) {
+            if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL_CORNER) {
                 adjacentWalls.push(1);
             }
-            if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL) {
+            if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL_CORNER) {
                 adjacentWalls.push(2);
             }
-            if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL) {
+            if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL_CORNER) {
                 adjacentWalls.push(3);
             }
-            if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL) {
+            if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL_CORNER) {
                 adjacentWalls.push(4);
             }
             if (compareArrays(adjacentWalls, [1, 3]) || compareArrays(adjacentWalls, [2, 4])) {
@@ -297,9 +326,15 @@ function addDoor(room, retry = false) {
     //Check to see if that door is valid
     if (getOutside([tile.x, tile.y]) != -1) {
         //Add the door
-        setRoomTile(room, tile.x, tile.y, TILES.DOOR);
-        drawMapCell(tile.x, tile.y, TILES.DOOR);
-        mapData[tile.y][tile.x].type = TILES.DOOR;
+        setRoomTile(room, tile.x, tile.y, TILES.DOOR_HORIZONTAL);
+
+        //Select the door and render it
+        if (getConnecting(tile.x, tile.y, TILES.WALL_CORNER) == 1) {
+            drawMapCell(tile.x, tile.y, TILES.DOOR_VERTICAL);
+        } else {
+            drawMapCell(tile.x, tile.y, TILES.DOOR_HORIZONTAL);
+        }
+        mapData[tile.y][tile.x].type = TILES.DOOR_HORIZONTAL;
         room.availableDoors.push([tile.x, tile.y]);
         //The door was successfully placed
         return true;
@@ -427,7 +462,7 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
     var x = 0, y = 0;
     for (x = startX - 1; x < expandX + startX + 1; x++) {
         for (y = startY - 1; y < expandY + startY + 1; y++) {
-            setRoomTile(room, x, y, TILES.WALL);
+            setRoomTile(room, x, y, TILES.WALL_CORNER);
         }
     }
     for (x = startX; x < expandX + startX; x++) {
@@ -465,9 +500,15 @@ function buildRoom(room) {
 /**
  * Draws a cell on the map
  */
-function drawMapCell(x, y, color) {
-    mapRenderer.fillStyle = color;
-    mapRenderer.fillRect(x * 20, y * 20, 20, 20);
+function drawMapCell(x, y, spritePosition) {
+    mapRenderer.drawImage(document.getElementById("tiles"), 0, spritePosition, 20, 20, Math.floor(x * 20), Math.floor(y * 20), 20, 20);
+}
+
+/**
+ * Draws a cell on the map overlay
+ */
+function drawOverlayCell(x, y, spritePosition) {
+    overlayRenderer.drawImage(document.getElementById("tiles"), 0, spritePosition, 20, 20, Math.floor(x * 20), Math.floor(y * 20), 20, 20);
 }
 
 /**
@@ -475,4 +516,5 @@ function drawMapCell(x, y, color) {
  */
 function clearMap() {
     mapRenderer.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+    overlayRenderer.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
 }
