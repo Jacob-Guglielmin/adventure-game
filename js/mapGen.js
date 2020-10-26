@@ -110,6 +110,11 @@ function fillMap() {
             if (rooms.length != 8) {
                 resetMap();
             } else {
+
+                //The rooms are fine
+
+                alignWalls();
+
                 //TODO Add decoration
             }
         } else {
@@ -220,8 +225,9 @@ function getRoomTile(room, x, y) {
 /**
  * Identifies which of the neighbouring cells are of a specific type.
  * Returns 1 for up-down, 2 for left-right, 0 for all or none
+ * If restrict is not disabled, 0 will also be returned if any cells not in the main direction are the type
  */
-function getConnecting(x, y, type) {
+function getConnecting(x, y, type, restrict = true) {
     var connections = 0;
 
     if (getTile(x, y - 1).type == type && getTile(x, y + 1).type == type) {
@@ -233,16 +239,64 @@ function getConnecting(x, y, type) {
     }
 
     if (connections == 3 || connections == 0) {
-        return 0;
+        if (type != TILES.WALL_CORNER) {
+            return 0;
+        } else {
+            var wallConnections = 0;
+
+            if ((getTile(x, y - 1).type == TILES.WALL_CORNER || getTile(x, y - 1).type == TILES.DOOR_HORIZONTAL) && (getTile(x, y + 1).type == TILES.WALL_CORNER || getTile(x, y + 1).type == TILES.DOOR_HORIZONTAL)) {
+                wallConnections += 1;
+            }
+        
+            if ((getTile(x - 1, y).type == TILES.WALL_CORNER || getTile(x - 1, y).type == TILES.DOOR_HORIZONTAL) && (getTile(x + 1, y).type == TILES.WALL_CORNER || getTile(x + 1, y).type == TILES.DOOR_HORIZONTAL)) {
+                wallConnections += 2;
+            }
+
+            if (wallConnections == 3 || wallConnections == 0) {
+                return 0;
+            } else {
+                if (restrict) {
+                    if (wallConnections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type)) {
+                        return 0;
+                    }
+                    if (wallConnections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type)) {
+                        return 0;
+                    }
+                    return wallConnections;
+                } else {
+                    return wallConnections;
+                }
+            }
+        }
     } else {
-        return connections;
+        if (restrict) {
+            if (type != TILES.WALL_CORNER) {
+                if (connections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type)) {
+                    return 0;
+                }
+                if (connections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type)) {
+                    return 0;
+                }
+                return connections;
+            } else {
+                if (connections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type || getTile(x - 1, y).type == TILES.DOOR_HORIZONTAL || getTile(x + 1, y).type == TILES.DOOR_HORIZONTAL)) {
+                    return 0;
+                }
+                if (connections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type || getTile(x, y - 1).type == TILES.DOOR_HORIZONTAL || getTile(x, y + 1).type == TILES.DOOR_HORIZONTAL)) {
+                    return 0;
+                }
+                return connections;
+            }
+        } else {
+            return connections;
+        }
     }
 }
 
 /**
  * Sets a room's tile, checking for existing tiles
  */
-function setRoomTile(room, x, y, type, override = false) {
+function setRoomTile(room, x, y, type) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
         //Never override a door
         if (getTile(x, y).type == TILES.DOOR_HORIZONTAL) {
@@ -256,7 +310,7 @@ function setRoomTile(room, x, y, type, override = false) {
         }
         if (oldTileType != -1) {
             //Never override anything with a wall
-            if (type == TILES.WALL_CORNER) {
+            if (type == TILES.WALL_CORNER && oldTileType != TILES.WALL_CORNER) {
                 return;
             //Never override a floor
             } else if (oldTileType == TILES.FLOOR || oldTileType == TILES.DOOR_HORIZONTAL) {
@@ -351,6 +405,31 @@ function addDoor(room, retry = false) {
         } else {
             //There are no valid door locations in this room
             return false;
+        }
+    }
+}
+
+/**
+ * Aligns all walls to the correct orientation
+ */
+function alignWalls() {
+    for (let i = 0; i < mapData.length; i++) {
+        for (let o = 0; o < mapData[i].length; o++) {
+            var tile = mapData[i][o];
+            if (tile.type == TILES.WALL_CORNER) {
+                switch (getConnecting(o, i, TILES.WALL_CORNER)) {
+                    case 1:
+                        drawMapCell(o, i, TILES.WALL_VERTICAL);
+                        break;
+
+                    case 2:
+                        drawMapCell(o, i, TILES.WALL_HORIZONTAL);
+                        break;
+
+                    default:
+                        break;
+                }
+            }
         }
     }
 }
