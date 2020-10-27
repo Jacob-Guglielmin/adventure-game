@@ -6,6 +6,7 @@ overlayCanvas = document.getElementById("overlayCanvas"),
 overlayRenderer = overlayCanvas.getContext("2d"),
 mapData = [],
 rooms = [],
+openWalls = [],
 
 seed = null,
 seededRandom = null,
@@ -34,6 +35,8 @@ variance = 0.2,
 roomSize = ((mapWidth + mapHeight) / 2) / 7,
 
 branches = 4,
+
+roomAmount = Math.floor((mapWidth * mapHeight) / 150),
 
 decorationRatios = {
     water: 0.2,
@@ -65,62 +68,45 @@ function fillMap() {
 
     //Generate the middle room
     newRoom([Math.floor(mapWidth / 2), Math.floor(mapHeight / 2)]);
-    
-    //Generate four rooms outside of the middle room
-    if(addDoor(rooms[0])) {
-        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
-        rooms[0].availableDoors.shift();
-    }
 
-    if(addDoor(rooms[0])) {
-        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
-        rooms[0].availableDoors.shift();
-    }
+    var moreRooms = true;
+    var roomNumber = 2;
+    var abort = false;
+    while (moreRooms) {
+        roomNumber = rooms.length + 1;
 
-    if(addDoor(rooms[0])) {
-        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
-        rooms[0].availableDoors.shift();
-    }
+        //Get the possible door locations
+        checkForDoors();
 
-    if(addDoor(rooms[0])) {
-        newRoom(getOutside(rooms[0].availableDoors[0]), rooms[0].availableDoors[0]);
-        rooms[0].availableDoors.shift();
-    }
-
-    if (rooms.length == 5) {    
-        //Generate one more room outside of two rooms
-        if(addDoor(rooms[3])) {
-            newRoom(getOutside(rooms[3].availableDoors[0]), rooms[3].availableDoors[0]);
-            rooms[3].availableDoors.shift();
-        }
-
-        if(addDoor(rooms[4])) {
-            newRoom(getOutside(rooms[4].availableDoors[0]), rooms[4].availableDoors[0]);
-            rooms[4].availableDoors.shift();
-        }
-
-        if (rooms.length == 7) {
-            //Generate one more room outside of the most recent room
-            if(addDoor(rooms[6])) {
-                newRoom(getOutside(rooms[6].availableDoors[0]), rooms[6].availableDoors[0]);
-                rooms[6].availableDoors.shift();
+        //Add a door somewhere
+        var doorCoords = undefined;
+        var noDoor = true;
+        while (noDoor) {
+            doorCoords = newDoor();
+            if (doorCoords != -1) {
+                noDoor = false;
             }
-
-            //Reset if rooms were missed
-            if (rooms.length != 8) {
-                resetMap();
-            } else {
-
-                //The rooms are fine
-
-                alignWalls();
-
-                //TODO Add decoration
-            }
-        } else {
-            resetMap();
         }
-    } else {
+
+        //Make a room
+        newRoom(getOutside(doorCoords), doorCoords);
+
+        //If a room couldn't be made at that door position, abort and try again
+        //TODO come up with something better than an abort
+        if (rooms.length < roomNumber) {
+            console.warn("Could not generate a room. Aborting...");
+            abort = true;
+            break;
+        }
+
+        if (rooms.length >= roomAmount) {
+            moreRooms = false;
+            alignWalls();
+            //TODO Add decoration
+        }
+    }
+
+    if (abort) {
         resetMap();
     }
 }
@@ -129,6 +115,7 @@ function resetMap() {
     clearMap();
     mapData = [];
     rooms = [];
+    openWalls = [];
     seed = Math.random();
     seededRandom = new Math.seedrandom(seed);
     fillMap();
@@ -343,44 +330,48 @@ function canExtendRoom(startX, startY, expandX, expandY) {
 /**
  * Finds all tiles that would be a good door
  */
-function checkForDoors(room) {
-    var goodTiles = [];
-    for (const tile of room.tiles) {
-        if (tile.type == TILES.WALL_CORNER) {
-            var adjacentWalls = [];
-            if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL_CORNER) {
-                adjacentWalls.push(1);
-            }
-            if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL_CORNER) {
-                adjacentWalls.push(2);
-            }
-            if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL_CORNER) {
-                adjacentWalls.push(3);
-            }
-            if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL_CORNER) {
-                adjacentWalls.push(4);
-            }
-            if (compareArrays(adjacentWalls, [1, 3]) || compareArrays(adjacentWalls, [2, 4])) {
-                goodTiles.push(tile);
+function checkForDoors() {
+    for (let i = 0; i < rooms.length; i++) {
+        var room = rooms[i];
+        var goodTiles = [];
+        for (const tile of room.tiles) {
+            if (tile.type == TILES.WALL_CORNER) {
+                var adjacentWalls = [];
+                if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL_CORNER) {
+                    adjacentWalls.push(1);
+                }
+                if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL_CORNER) {
+                    adjacentWalls.push(2);
+                }
+                if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL_CORNER) {
+                    adjacentWalls.push(3);
+                }
+                if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL_CORNER) {
+                    adjacentWalls.push(4);
+                }
+                if (compareArrays(adjacentWalls, [1, 3]) || compareArrays(adjacentWalls, [2, 4])) {
+                    if (getOutside([tile.x, tile.y]) != -1) {
+                        goodTiles.push(tile);
+                    }
+                }
             }
         }
+        for (let i = 0; i < goodTiles.length; i++) {
+            openWalls.push(goodTiles[i]); 
+        }
     }
-    room.openWalls = goodTiles;
 }
 
 /**
- * Adds a door to a room
+ * Adds a door to the map
  */
-function addDoor(room, retry = false) {
-    //Don't refresh the list if this is a retry
-    if (!retry) {
-        checkForDoors(room);
-    }
-    var tile = randomFromArray(room.openWalls);
+function newDoor() {
+    var tile = randomFromArray(openWalls);
     //Check to see if that door is valid
     if (getOutside([tile.x, tile.y]) != -1) {
         //Add the door
-        setRoomTile(room, tile.x, tile.y, TILES.DOOR_HORIZONTAL);
+        var room = getTile(tile.x, tile.y).room;
+        setRoomTile(rooms[room], tile.x, tile.y, TILES.DOOR_HORIZONTAL);
 
         //Select the door and render it
         if (getConnecting(tile.x, tile.y, TILES.WALL_CORNER) == 1) {
@@ -389,23 +380,12 @@ function addDoor(room, retry = false) {
             drawMapCell(tile.x, tile.y, TILES.DOOR_HORIZONTAL);
         }
         mapData[tile.y][tile.x].type = TILES.DOOR_HORIZONTAL;
-        room.availableDoors.push([tile.x, tile.y]);
         //The door was successfully placed
-        return true;
+        return [tile.x, tile.y];
     } else {
-        //Try again
-        room.openWalls.splice(room.openWalls.indexOf(tile), 1);
-        if (room.openWalls.length != 0) {
-            //This is recursive, but it should end eventually
-            if(addDoor(room, true)) {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            //There are no valid door locations in this room
-            return false;
-        }
+        //This wall isn't open
+        openWalls.splice(openWalls.indexOf(tile), 1);
+        return -1;
     }
 }
 
@@ -465,8 +445,6 @@ function newRoom(coords, parentDoor = -1) {
         baseWidth: randomBetween(3, roomSize),
         baseHeight: randomBetween(3, roomSize),
         tiles: [],
-        openWalls: [],
-        availableDoors: [],
         parentDoor: parentDoor,
         id: rooms.length
     }
