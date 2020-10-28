@@ -76,7 +76,6 @@ function keyHandler(e) {
                 break;
 
             default:
-                console.warn("Key not recognized with keycode " + key);
                 break;
         }
     }

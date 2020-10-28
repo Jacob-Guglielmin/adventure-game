@@ -78,24 +78,38 @@ function fillMap() {
         //Get the possible door locations
         checkForDoors();
 
-        //Add a door somewhere
-        var doorCoords = undefined;
-        var noDoor = true;
-        while (noDoor) {
-            doorCoords = newDoor();
-            if (doorCoords != -1) {
-                noDoor = false;
+        var roomAttempts = 0;
+        while (true) {
+            //Add a door somewhere
+            var doorCoords = undefined;
+            var noDoor = true;
+            while (noDoor) {
+                doorCoords = newDoor();
+                if (doorCoords != -1) {
+                    noDoor = false;
+                }
+            }
+
+            //Make a room
+            newRoom(getOutside(doorCoords), doorCoords);
+
+            //If a room was made at that door position, exit, otherwise try again with a new door
+            if (rooms.length == roomNumber) {
+                break;
+            } else {
+                mapData[doorCoords[1]][doorCoords[0]].type = TILES.WALL_CORNER;
+
+                //If we've tried 10 times already, abort and start over
+                if (roomAttempts >= 10) {
+                    abort = true;
+                    break;
+                } else {
+                    roomAttempts++;
+                }
             }
         }
 
-        //Make a room
-        newRoom(getOutside(doorCoords), doorCoords);
-
-        //If a room couldn't be made at that door position, abort and try again
-        //TODO come up with something better than an abort
-        if (rooms.length < roomNumber) {
-            console.warn("Could not generate a room. Aborting...");
-            abort = true;
+        if (abort) {
             break;
         }
 
@@ -407,6 +421,7 @@ function alignWalls() {
                         break;
 
                     default:
+                        drawMapCell(o, i, TILES.WALL_CORNER);
                         break;
                 }
             }
@@ -540,7 +555,9 @@ function selectRoomTiles(room, startX, startY, expandX, expandY) {
 function buildRoom(room) {
     if (room.tiles.length > 30) {
         for (const tile of room.tiles) {
-            drawMapCell(tile.x, tile.y, tile.type);
+            if (tile.type != TILES.WALL_CORNER) {
+                drawMapCell(tile.x, tile.y, tile.type);
+            }
             mapData[tile.y][tile.x].type = tile.type;
             mapData[tile.y][tile.x].room = room.id;
         }
