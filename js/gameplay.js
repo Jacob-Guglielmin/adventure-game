@@ -23,9 +23,7 @@ function init() {
 
     mapGenInit();
 
-    coords[0] = rooms[0].x;
-    coords[1] = rooms[0].y;
-
+    placePlayer();
     drawPlayer(coords[0], coords[1]);
 
     document.addEventListener("keydown", keyHandler);
@@ -39,10 +37,7 @@ function reset() {
     resetMap();
 
     clearPlayer();
-
-    coords[0] = rooms[0].x;
-    coords[1] = rooms[0].y;
-
+    placePlayer();
     drawPlayer(coords[0], coords[1]);
 }
 
@@ -188,6 +183,21 @@ function drawPlayer(x, y) {
  */
 function clearPlayer() {
     playerRenderer.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
+}
+
+/**
+ * Sets the player coordinates to a tile where the player can be in the first room
+ */
+function placePlayer() {
+    while (true) {
+        var tile = randomFromArray(rooms[0].tiles);
+
+        if (tile.type == TILES.FLOOR || tile.type == TILES.FLOOR_EDGE) {
+            coords[0] = tile.x;
+            coords[1] = tile.y;
+            break;
+        }
+    }
 }
 
 var loadInterval = setInterval(() => {

@@ -26,7 +26,8 @@ TILES = {
     DOOR_HORIZONTAL: 100,
     DOOR_VERTICAL: 120,
     FLOOR_EDGE: 140,
-    FLOOR: 160
+    FLOOR: 160,
+    WATER: 180
 },
 
 //CONFIG VALUES
@@ -313,8 +314,11 @@ function setRoomTile(room, x, y, type) {
             //Never override anything with a wall
             if (type == TILES.WALL_CORNER && oldTileType != TILES.WALL_CORNER) {
                 return;
-            //Never override a floor
-            } else if (oldTileType == TILES.FLOOR || oldTileType == TILES.DOOR_HORIZONTAL) {
+            //Never override a door
+            } else if (oldTileType == TILES.DOOR_HORIZONTAL) {
+                return;
+            //Never override a floor or water with anything besides water
+            } else if ((oldTileType == TILES.FLOOR || oldTileType == TILES.WATER) && type != TILES.WATER) {
                 return;
             //Override anything else, and remove the old copy of the tile from the room
             } else {
@@ -488,6 +492,13 @@ function planRoom(room) {
         }
     }
 
+    //Plan where decorations should be
+    //Water
+    var randomWaterBranch = -1;
+    if (seededRandom() < decorationRatios.water || rooms.length == 0) {
+        randomWaterBranch = randomBetween(0, branches - 1);
+    }
+
     for (let i = 0; i < branches; i++) {
         var startX = room.x, startY = room.y, expandX = 1, expandY = 1;
         if (room.tiles.length != 0) {
@@ -520,7 +531,7 @@ function planRoom(room) {
                     break;
             }
             if (canExtendRoom(startX, startY, expandX, expandY)) {
-                selectRoomTiles(room, startX, startY, expandX, expandY);
+                selectRoomTiles(room, startX, startY, expandX, expandY, [i == randomWaterBranch]);
             }
         }  
     }
@@ -530,21 +541,26 @@ function planRoom(room) {
 /**
  * Constructs the room in tiles
  */
-function selectRoomTiles(room, startX, startY, expandX, expandY) {
-    var x = 0, y = 0;
+function selectRoomTiles(room, startX, startY, expandX, expandY, decoration) {
+    var x = 0, y = 0, tilePlacing = TILES.WALL_CORNER;
     for (x = startX - 1; x < expandX + startX + 1; x++) {
         for (y = startY - 1; y < expandY + startY + 1; y++) {
-            setRoomTile(room, x, y, TILES.WALL_CORNER);
+            setRoomTile(room, x, y, tilePlacing);
         }
     }
+    tilePlacing = TILES.FLOOR_EDGE;
     for (x = startX; x < expandX + startX; x++) {
         for (y = startY; y < expandY + startY; y++) {
-            setRoomTile(room, x, y, TILES.FLOOR_EDGE);
+            setRoomTile(room, x, y, tilePlacing);
         }
+    }
+    tilePlacing = TILES.FLOOR;
+    if (decoration[0]) {
+        tilePlacing = TILES.WATER;
     }
     for (x = startX + 1; x < expandX + startX - 1; x++) {
         for (y = startY + 1; y < expandY + startY - 1; y++) {
-            setRoomTile(room, x, y, TILES.FLOOR);
+            setRoomTile(room, x, y, tilePlacing);
         }
     }
 }
