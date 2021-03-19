@@ -6,13 +6,13 @@
         <link href="css/main.css" rel="stylesheet">
     </head>
     <body>
-        <div id="game">
+        <div id="game" onmousedown="openFullscreen()">
             <canvas id="mapCanvas"></canvas>
             <canvas id="overlayCanvas"></canvas>
             <canvas id="playerCanvas"></canvas>
         </div>
         <script>
-            var imageLoaded = false;
+            let imageLoaded = false;
         </script>
         <img id="tiles" src="img/tiles.png" onload="imageLoaded = true;" style="display: none; visibility: hidden;">
         <script src="js/mapGen.js"></script>

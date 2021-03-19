@@ -1,6 +1,8 @@
 body {
     user-select: none;
     background-color: #444444;
+    padding: 0;
+    margin: 0;
 }
 
 canvas {

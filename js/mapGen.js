@@ -1,48 +1,51 @@
 "use strict";
 
-var mapCanvas = document.getElementById("mapCanvas"),
-mapRenderer = mapCanvas.getContext("2d"),
-overlayCanvas = document.getElementById("overlayCanvas"),
-overlayRenderer = overlayCanvas.getContext("2d"),
-mapData = [],
-rooms = [],
-openWalls = [],
+/*
+    ***ALL COORDINATE SYSTEMS ARE Y,X***
+*/
+let mapData = [],
+    rooms = [],
+    openWalls = [],
 
-seed = null,
-seededRandom = null,
+    seed = null,
+    seededRandom = null,
 
-mapWidth = 60,
-mapHeight = 30,
+    mapWidth = 60,
+    mapHeight = 30,
 
-buildAttempts = 0,
+    buildAttempts = 0,
 
-//Tile types
-TILES = {
-    EMPTY: 0,
-    PLAYER: 20,
-    WALL_CORNER: 40,
-    WALL_HORIZONTAL: 60,
-    WALL_VERTICAL: 80,
-    DOOR_HORIZONTAL: 100,
-    DOOR_VERTICAL: 120,
-    FLOOR_EDGE: 140,
-    FLOOR: 160,
-    WATER: 180
-},
+    //Tile types
+    TILES = {
+        EMPTY: 0,
+        PLAYER: 20,
+        WALL_CORNER: 40,
+        WALL_HORIZONTAL: 60,
+        WALL_VERTICAL: 80,
+        DOOR_HORIZONTAL: 100,
+        DOOR_VERTICAL: 120,
+        FLOOR_EDGE: 140,
+        FLOOR: 160,
+        WATER: 180
+    },
 
-//CONFIG VALUES
-variance = 0.2,
+    WALLS = [TILES.WALL_CORNER, TILES.WALL_VERTICAL, TILES.WALL_HORIZONTAL],
+    DOORS = [TILES.DOOR_HORIZONTAL, TILES.DOOR_VERTICAL],
+    FLOORS = [TILES.FLOOR, TILES.FLOOR_EDGE],
 
-roomSize = ((mapWidth + mapHeight) / 2) / 7,
+    //CONFIG VALUES
+    variance = 0.2,
 
-branches = 4,
+    roomSize = Math.floor(((mapWidth + mapHeight) / 2) / 7),
 
-roomAmount = Math.floor((mapWidth * mapHeight) / 150),
+    branches = 4,
 
-decorationRatios = {
-    water: 0.2,
-    grass: 0.3,
-};
+    roomAmount = Math.floor((mapWidth * mapHeight) / 150),
+
+    decorationRatios = {
+        water: 0.2,
+        grass: 0.3,
+    };
 
 /**
  * Seeded random function, many thanks to David Bau (http://davidbau.com/archives/2010/01/30/random_seeds_coded_hints_and_quintillions.html)
@@ -70,20 +73,20 @@ function fillMap() {
     //Generate the middle room
     newRoom([Math.floor(mapWidth / 2), Math.floor(mapHeight / 2)]);
 
-    var moreRooms = true;
-    var roomNumber = 2;
-    var abort = false;
+    let moreRooms = true;
+    let roomNumber = 2;
+    let abort = false;
     while (moreRooms) {
         roomNumber = rooms.length + 1;
 
         //Get the possible door locations
         checkForDoors();
 
-        var roomAttempts = 0;
+        let roomAttempts = 0;
         while (true) {
             //Add a door somewhere
-            var doorCoords = undefined;
-            var noDoor = true;
+            let doorCoords = undefined;
+            let noDoor = true;
             while (noDoor) {
                 doorCoords = newDoor();
                 if (doorCoords != -1) {
@@ -156,7 +159,7 @@ function randomFromArray(array) {
 function compareArrays(a, b) {
     if (a == null || b == null) return false;
     if (a.length !== b.length) return false;
-    for (var i = 0; i < a.length; ++i) {
+    for (let i = 0; i < a.length; ++i) {
         if (a[i] !== b[i]) return false;
     }
     return true;
@@ -166,12 +169,6 @@ function compareArrays(a, b) {
  * Populates the map with empty squares
  */
 function addCells() {
-    for (let i = 0; i < mapHeight; i++) {
-        mapData[i] = [];
-        for (let o = 0; o < mapWidth; o++) {
-            drawMapCell(o, i, TILES.EMPTY);
-        }
-    }
     for (let i = 0; i < mapHeight; i++) {
         mapData[i] = [];
         for (let o = 0; o < mapWidth; o++) {
@@ -185,7 +182,7 @@ function addCells() {
  */
 function getTile(x, y) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
-        var tile = mapData[y][x];
+        let tile = mapData[y][x];
         return tile;
     } else {
         return -1;
@@ -203,10 +200,10 @@ function selectRandomTile(room) {
  * Selects a random floor tile
  */
 function selectRandomFloor(room) {
-    var tile = null;
+    let tile = null;
     while (true) {
         tile = selectRandomTile(room);
-        if (tile.type == TILES.FLOOR || tile.type == TILES.FLOOR_EDGE) {
+        if (FLOORS.indexOf(tile.type) != -1) {
             return tile;
         }
     }
@@ -230,27 +227,27 @@ function getRoomTile(room, x, y) {
  * If restrict is not disabled, 0 will also be returned if any cells not in the main direction are the type
  */
 function getConnecting(x, y, type, restrict = true) {
-    var connections = 0;
+    let connections = 0;
 
-    if (getTile(x, y - 1).type == type && getTile(x, y + 1).type == type) {
+    if (type.indexOf(getTile(x, y - 1).type) != -1 && type.indexOf(getTile(x, y + 1).type) != -1) {
         connections += 1;
     }
 
-    if (getTile(x - 1, y).type == type && getTile(x + 1, y).type == type) {
+    if (type.indexOf(getTile(x - 1, y).type) != -1 && type.indexOf(getTile(x + 1, y).type) != -1) {
         connections += 2;
     }
 
     if (connections == 3 || connections == 0) {
-        if (type != TILES.WALL_CORNER) {
+        if (!compareArrays(type, WALLS)) {
             return 0;
         } else {
-            var wallConnections = 0;
+            let wallConnections = 0;
 
-            if ((getTile(x, y - 1).type == TILES.WALL_CORNER || getTile(x, y - 1).type == TILES.DOOR_HORIZONTAL) && (getTile(x, y + 1).type == TILES.WALL_CORNER || getTile(x, y + 1).type == TILES.DOOR_HORIZONTAL)) {
+            if ((WALLS.indexOf(getTile(x, y - 1).type) != -1 || WALLS.indexOf(getTile(x, y - 1).type) != -1) && (WALLS.indexOf(getTile(x, y + 1).type) != -1 || WALLS.indexOf(getTile(x, y + 1).type) != -1)) {
                 wallConnections += 1;
             }
         
-            if ((getTile(x - 1, y).type == TILES.WALL_CORNER || getTile(x - 1, y).type == TILES.DOOR_HORIZONTAL) && (getTile(x + 1, y).type == TILES.WALL_CORNER || getTile(x + 1, y).type == TILES.DOOR_HORIZONTAL)) {
+            if ((WALLS.indexOf(getTile(x - 1, y).type) != -1 || WALLS.indexOf(getTile(x - 1, y).type) != -1) && (WALLS.indexOf(getTile(x + 1, y).type) != -1 || WALLS.indexOf(getTile(x + 1, y).type) != -1)) {
                 wallConnections += 2;
             }
 
@@ -258,10 +255,10 @@ function getConnecting(x, y, type, restrict = true) {
                 return 0;
             } else {
                 if (restrict) {
-                    if (wallConnections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type)) {
+                    if (wallConnections == 1 && (type.indexOf(getTile(x - 1, y).type) != -1 || type.indexOf(getTile(x + 1, y).type) != -1)) {
                         return 0;
                     }
-                    if (wallConnections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type)) {
+                    if (wallConnections == 2 && (type.indexOf(getTile(x, y - 1).type) != -1 || type.indexOf(getTile(x, y + 1).type) != -1)) {
                         return 0;
                     }
                     return wallConnections;
@@ -272,19 +269,19 @@ function getConnecting(x, y, type, restrict = true) {
         }
     } else {
         if (restrict) {
-            if (type != TILES.WALL_CORNER) {
-                if (connections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type)) {
+            if (!compareArrays(type, WALLS)) {
+                if (connections == 1 && (type.indexOf(getTile(x - 1, y).type) != -1 || type.indexOf(getTile(x + 1, y).type) != -1)) {
                     return 0;
                 }
-                if (connections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type)) {
+                if (connections == 2 && (type.indexOf(getTile(x, y - 1).type) != -1 || type.indexOf(getTile(x, y + 1).type) != -1)) {
                     return 0;
                 }
                 return connections;
             } else {
-                if (connections == 1 && (getTile(x - 1, y).type == type || getTile(x + 1, y).type == type || getTile(x - 1, y).type == TILES.DOOR_HORIZONTAL || getTile(x + 1, y).type == TILES.DOOR_HORIZONTAL)) {
+                if (connections == 1 && (type.indexOf(getTile(x - 1, y).type) != -1 || type.indexOf(getTile(x + 1, y).type) != -1 || DOORS.indexOf(getTile(x - 1, y).type) != -1 || DOORS.indexOf(getTile(x + 1, y).type) != -1)) {
                     return 0;
                 }
-                if (connections == 2 && (getTile(x, y - 1).type == type || getTile(x, y + 1).type == type || getTile(x, y - 1).type == TILES.DOOR_HORIZONTAL || getTile(x, y + 1).type == TILES.DOOR_HORIZONTAL)) {
+                if (connections == 2 && (type.indexOf(getTile(x, y - 1).type) != -1 || type.indexOf(getTile(x, y + 1).type) != -1 || DOORS.indexOf(getTile(x, y - 1).type) != -1 || DOORS.indexOf(getTile(x, y + 1).type) != -1)) {
                     return 0;
                 }
                 return connections;
@@ -301,21 +298,22 @@ function getConnecting(x, y, type, restrict = true) {
 function setRoomTile(room, x, y, type) {
     if (x >= 0 && y >= 0 && x <= mapWidth - 1 && y <= mapHeight - 1) {
         //Never override a door
-        if (getTile(x, y).type == TILES.DOOR_HORIZONTAL) {
+        if (DOORS.indexOf(getTile(x, y).type) != -1) {
             return;
         }
-        var oldTile = getRoomTile(room, x, y);
+        let oldTile = getRoomTile(room, x, y);
+        let oldTileType;
         if (oldTile != -1) {
-            var oldTileType = oldTile.type;
+            oldTileType = oldTile.type;
         } else {
-            var oldTileType = -1;
+            oldTileType = -1;
         }
         if (oldTileType != -1) {
             //Never override anything with a wall
-            if (type == TILES.WALL_CORNER && oldTileType != TILES.WALL_CORNER) {
+            if (WALLS.indexOf(type) != -1 && !WALLS.indexOf(oldTileType) != -1) {
                 return;
             //Never override a door
-            } else if (oldTileType == TILES.DOOR_HORIZONTAL) {
+            } else if (DOORS.indexOf(oldTileType) != -1) {
                 return;
             //Never override a floor or water with anything besides water
             } else if ((oldTileType == TILES.FLOOR || oldTileType == TILES.WATER) && type != TILES.WATER) {
@@ -350,21 +348,21 @@ function canExtendRoom(startX, startY, expandX, expandY) {
  */
 function checkForDoors() {
     for (let i = 0; i < rooms.length; i++) {
-        var room = rooms[i];
-        var goodTiles = [];
+        let room = rooms[i];
+        let goodTiles = [];
         for (const tile of room.tiles) {
-            if (tile.type == TILES.WALL_CORNER) {
-                var adjacentWalls = [];
-                if (getRoomTile(room, tile.x, tile.y - 1).type == TILES.WALL_CORNER) {
+            if (WALLS.indexOf(tile.type) != -1) {
+                let adjacentWalls = [];
+                if (WALLS.indexOf(getRoomTile(room, tile.x, tile.y - 1).type) != -1) {
                     adjacentWalls.push(1);
                 }
-                if (getRoomTile(room, tile.x + 1, tile.y).type == TILES.WALL_CORNER) {
+                if (WALLS.indexOf(getRoomTile(room, tile.x + 1, tile.y).type) != -1) {
                     adjacentWalls.push(2);
                 }
-                if (getRoomTile(room, tile.x, tile.y + 1).type == TILES.WALL_CORNER) {
+                if (WALLS.indexOf(getRoomTile(room, tile.x, tile.y + 1).type) != -1) {
                     adjacentWalls.push(3);
                 }
-                if (getRoomTile(room, tile.x - 1, tile.y).type == TILES.WALL_CORNER) {
+                if (WALLS.indexOf(getRoomTile(room, tile.x - 1, tile.y).type) != -1) {
                     adjacentWalls.push(4);
                 }
                 if (compareArrays(adjacentWalls, [1, 3]) || compareArrays(adjacentWalls, [2, 4])) {
@@ -384,20 +382,19 @@ function checkForDoors() {
  * Adds a door to the map
  */
 function newDoor() {
-    var tile = randomFromArray(openWalls);
+    let tile = randomFromArray(openWalls);
     //Check to see if that door is valid
     if (getOutside([tile.x, tile.y]) != -1) {
         //Add the door
-        var room = getTile(tile.x, tile.y).room;
+        let room = getTile(tile.x, tile.y).room;
         setRoomTile(rooms[room], tile.x, tile.y, TILES.DOOR_HORIZONTAL);
 
         //Select the door and render it
-        if (getConnecting(tile.x, tile.y, TILES.WALL_CORNER) == 1) {
-            drawMapCell(tile.x, tile.y, TILES.DOOR_VERTICAL);
+        if (getConnecting(tile.x, tile.y, WALLS) == 1) {
+            mapData[tile.y][tile.x].type = TILES.DOOR_VERTICAL;
         } else {
-            drawMapCell(tile.x, tile.y, TILES.DOOR_HORIZONTAL);
+            mapData[tile.y][tile.x].type = TILES.DOOR_HORIZONTAL;
         }
-        mapData[tile.y][tile.x].type = TILES.DOOR_HORIZONTAL;
         //The door was successfully placed
         return [tile.x, tile.y];
     } else {
@@ -413,19 +410,19 @@ function newDoor() {
 function alignWalls() {
     for (let i = 0; i < mapData.length; i++) {
         for (let o = 0; o < mapData[i].length; o++) {
-            var tile = mapData[i][o];
-            if (tile.type == TILES.WALL_CORNER) {
-                switch (getConnecting(o, i, TILES.WALL_CORNER)) {
+            let tile = mapData[i][o];
+            if (WALLS.indexOf(tile.type) != -1) {
+                switch (getConnecting(o, i, WALLS)) {
                     case 1:
-                        drawMapCell(o, i, TILES.WALL_VERTICAL);
+                        mapData[i][o].type = TILES.WALL_VERTICAL;
                         break;
 
                     case 2:
-                        drawMapCell(o, i, TILES.WALL_HORIZONTAL);
+                        mapData[i][o].type = TILES.WALL_HORIZONTAL;
                         break;
 
                     default:
-                        drawMapCell(o, i, TILES.WALL_CORNER);
+                        mapData[i][o].type = TILES.WALL_CORNER;
                         break;
                 }
             }
@@ -458,7 +455,7 @@ function getOutside(location) {
  * @param coords the x and y coordinates to start generating the room at
  */
 function newRoom(coords, parentDoor = -1) {
-    var room = {
+    let room = {
         x: coords[0],
         y: coords[1],
         baseWidth: randomBetween(3, roomSize),
@@ -468,7 +465,6 @@ function newRoom(coords, parentDoor = -1) {
         id: rooms.length
     }
     room.steps = Math.max(room.baseWidth + room.baseHeight, roomSize * (1 - seededRandom() * variance));
-
     planRoom(room);
 }
 
@@ -476,7 +472,7 @@ function newRoom(coords, parentDoor = -1) {
  * Plans a room in terms of shape
  */
 function planRoom(room) {
-    var width = room.baseWidth,
+    let width = room.baseWidth,
     height = room.baseHeight,
     mustExpand = [];
     
@@ -494,21 +490,21 @@ function planRoom(room) {
 
     //Plan where decorations should be
     //Water
-    var randomWaterBranch = -1;
+    let randomWaterBranch = -1;
     if (seededRandom() < decorationRatios.water || rooms.length == 0) {
         randomWaterBranch = randomBetween(0, branches - 1);
     }
 
     for (let i = 0; i < branches; i++) {
-        var startX = room.x, startY = room.y, expandX = 1, expandY = 1;
+        let startX = room.x, startY = room.y, expandX = 1, expandY = 1;
         if (room.tiles.length != 0) {
-            var randomTile = selectRandomFloor(room);
+            let randomTile = selectRandomFloor(room);
             startX = randomTile.x;
             startY = randomTile.y;
         }
         for (let o = 0; o < room.steps; o++) {
             //Select a side to expand, priority is on sides that need to be expanded
-            var sideToExpand = randomBetween(1, 4);
+            let sideToExpand = randomBetween(1, 4);
             if (mustExpand.length != 0) {
                 sideToExpand = randomFromArray(mustExpand);
                 mustExpand.splice(mustExpand.indexOf(sideToExpand), 1);
@@ -542,7 +538,7 @@ function planRoom(room) {
  * Constructs the room in tiles
  */
 function selectRoomTiles(room, startX, startY, expandX, expandY, decoration) {
-    var x = 0, y = 0, tilePlacing = TILES.WALL_CORNER;
+    let x = 0, y = 0, tilePlacing = TILES.WALL_CORNER;
     for (x = startX - 1; x < expandX + startX + 1; x++) {
         for (y = startY - 1; y < expandY + startY + 1; y++) {
             setRoomTile(room, x, y, tilePlacing);
@@ -571,9 +567,6 @@ function selectRoomTiles(room, startX, startY, expandX, expandY, decoration) {
 function buildRoom(room) {
     if (room.tiles.length > 30) {
         for (const tile of room.tiles) {
-            if (tile.type != TILES.WALL_CORNER) {
-                drawMapCell(tile.x, tile.y, tile.type);
-            }
             mapData[tile.y][tile.x].type = tile.type;
             mapData[tile.y][tile.x].room = room.id;
         }
@@ -583,28 +576,8 @@ function buildRoom(room) {
         if (buildAttempts <= 10) {
             buildAttempts++;
             newRoom([room.x, room.y], room.parentDoor);
+        } else {
+            console.warn("Took more than 10 attempts to make room " + room.id);
         }
     }
-}
-
-/**
- * Draws a cell on the map
- */
-function drawMapCell(x, y, spritePosition) {
-    mapRenderer.drawImage(document.getElementById("tiles"), 0, spritePosition, 20, 20, Math.floor(x * 20), Math.floor(y * 20), 20, 20);
-}
-
-/**
- * Draws a cell on the map overlay
- */
-function drawOverlayCell(x, y, spritePosition) {
-    overlayRenderer.drawImage(document.getElementById("tiles"), 0, spritePosition, 20, 20, Math.floor(x * 20), Math.floor(y * 20), 20, 20);
-}
-
-/**
- * Deletes the map
- */
-function clearMap() {
-    mapRenderer.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-    overlayRenderer.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
 }
